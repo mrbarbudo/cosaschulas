@@ -136,6 +136,8 @@ ul.plain{list-style:none; margin:0; padding:0}
   display:flex; align-items:center; gap:10px; padding:12px; border-radius:12px;
   background:var(--surface2); margin-bottom:8px;
 }
+.milestone{border-left:3px solid var(--accent); padding-left:12px; margin:0 0 16px}
+.milestone .mdate{font-weight:600; margin-bottom:8px}
 .transfer .who{font-weight:700}
 .transfer .arrow{color:var(--accent); font-weight:800}
 .transfer .amount{margin-left:auto; font-family:"Bricolage Grotesque",sans-serif; font-size:1.05rem}
@@ -143,10 +145,11 @@ ul.plain{list-style:none; margin:0; padding:0}
 table.balances{width:100%; border-collapse:collapse; font-size:.92rem}
 table.balances th{
   text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.07em;
-  color:var(--muted); font-weight:600; padding:6px 8px 6px 0; border-bottom:1px solid var(--line);
+  color:var(--muted); font-weight:600; padding:6px 0 6px 16px; border-bottom:1px solid var(--line);
 }
-table.balances td{padding:8px 8px 8px 0; border-bottom:1px solid var(--line); vertical-align:top}
-table.balances td.num,table.balances th.num{text-align:right; font-variant-numeric:tabular-nums; padding-right:0}
+table.balances td{padding:8px 0 8px 16px; border-bottom:1px solid var(--line); vertical-align:top}
+table.balances th:first-child,table.balances td:first-child{padding-left:0}
+table.balances td.num,table.balances th.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
 .tablewrap{overflow-x:auto}
 
 .empty{
@@ -233,10 +236,10 @@ hr.sep{border:0; border-top:1px solid var(--line); margin:16px 0}
     <div class="field"><label for="pName">Nombre</label>
       <input type="text" id="pName" required maxlength="40" style="width:100%"></div>
     <div class="fieldrow">
-      <div class="field"><label for="pFrom">Llega</label><input type="date" id="pFrom" required style="width:100%"></div>
-      <div class="field"><label for="pTo">Se va</label><input type="date" id="pTo" required style="width:100%"></div>
+      <div class="field"><label for="pFrom">Llega (check-in)</label><input type="date" id="pFrom" required style="width:100%"></div>
+      <div class="field"><label for="pTo">Se va (check-out)</label><input type="date" id="pTo" required style="width:100%"></div>
     </div>
-    <p class="hint" style="margin:-6px 0 0">Sus días de estadía definen qué parte le toca de los gastos prorrateados por día.</p>
+    <p class="hint" style="margin:-6px 0 0">Se cuentan noches: del 10 al 13 son 3 noches — la noche del día de salida ya no se cuenta. Sus noches definen qué le toca de los gastos “por noche”.</p>
     <div class="dlgactions">
       <button type="button" class="btn ghost" data-act="close-dlg">Cancelar</button>
       <button type="submit" class="btn primary" id="pSubmit">Agregar</button>
@@ -255,23 +258,31 @@ hr.sep{border:0; border-top:1px solid var(--line); margin:16px 0}
       <div class="field"><label for="ePayer">Lo pagó</label>
         <select id="ePayer" required style="width:100%"></select></div>
     </div>
-    <div class="fieldrow">
-      <div class="field"><label for="eFrom">Cubre desde</label><input type="date" id="eFrom" required style="width:100%"></div>
-      <div class="field"><label for="eTo">Hasta</label><input type="date" id="eTo" required style="width:100%"></div>
-    </div>
-    <div style="margin:-6px 0 12px"><button type="button" class="btn small ghost" data-act="expense-whole-trip">Cubre todo el viaje</button></div>
+    <div class="field"><label for="eCategory">Categoría</label>
+      <select id="eCategory" style="width:100%">
+        <option value="alojamiento">Alojamiento</option>
+        <option value="transporte">Transporte</option>
+        <option value="comida">Comida y súper</option>
+        <option value="otros" selected>Otros</option>
+      </select></div>
     <div class="field">
       <label>¿Cómo se reparte?</label>
-      <div class="radiorow">
-        <label><input type="radio" name="eMode" value="days" checked> Por días de estadía</label>
-        <label><input type="radio" name="eMode" value="equal"> Partes iguales</label>
+      <div class="radiorow" style="flex-wrap:wrap">
+        <label><input type="radio" name="eMode" value="per_day" checked> Por noche</label>
+        <label><input type="radio" name="eMode" value="shared_all"> Todos por igual</label>
+        <label><input type="radio" name="eMode" value="custom_split"> Grupo del día</label>
       </div>
-      <p class="hint" id="eModeHint">Cada persona paga según cuántos de esos días estuvo en el viaje.</p>
+      <p class="hint" id="eModeHint">El costo de cada noche se divide solo entre quienes duermen esa noche (ideal para arriendos).</p>
     </div>
-    <div class="field">
+    <div class="fieldrow" id="eDatesRange">
+      <div class="field"><label for="eFrom" id="eFromLabel">Primera noche</label><input type="date" id="eFrom" required style="width:100%"></div>
+      <div class="field"><label for="eTo" id="eToLabel">Hasta (check-out)</label><input type="date" id="eTo" style="width:100%"></div>
+    </div>
+    <div style="margin:-6px 0 12px" id="eWholeWrap"><button type="button" class="btn small ghost" data-act="expense-whole-trip">Cubre todo el viaje</button></div>
+    <div class="field" id="ePartsWrap">
       <label>Entre quiénes</label>
       <div class="chips" id="eParts"></div>
-      <p class="hint">Con todos marcados, quien se sume después al viaje también entra al reparto.</p>
+      <p class="hint" id="ePartsHint">Con todos marcados, entra al reparto quien esté presente (incluso si se suma después).</p>
     </div>
     <div class="dlgactions">
       <button type="button" class="btn danger ghost" id="eDelete" data-act="expense-delete" hidden>Eliminar</button>
@@ -312,8 +323,11 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const todayISO = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
 const d2n = s => { const [y,m,d] = s.split("-").map(Number); return Math.round(Date.UTC(y, m-1, d) / 86400000); };
-const overlapDays = (a1,a2,b1,b2) => Math.max(0, Math.min(d2n(a2), d2n(b2)) - Math.max(d2n(a1), d2n(b1)) + 1);
-const spanDays = (a,b) => d2n(b) - d2n(a) + 1;
+const n2d = n => { const dt = new Date(n * 86400000); return dt.getUTCFullYear() + "-" + String(dt.getUTCMonth()+1).padStart(2,"0") + "-" + String(dt.getUTCDate()).padStart(2,"0"); };
+const addDays = (s,k) => n2d(d2n(s) + k);
+// Convención hotelera: una persona está presente la noche de `date` si checkIn <= date < checkOut.
+const nightsBetween = (a,b) => Math.max(0, d2n(b) - d2n(a));
+const overlapNights = (a1,a2,b1,b2) => Math.max(0, Math.min(d2n(a2), d2n(b2)) - Math.max(d2n(a1), d2n(b1)));
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 function fmtDate(s){ if(!s) return ""; const [y,m,d] = s.split("-").map(Number); return d + " " + MESES[m-1]; }
 function fmtRange(a,b){ return a === b ? fmtDate(a) : fmtDate(a) + " – " + fmtDate(b); }
@@ -336,6 +350,32 @@ function loadState(){
   catch(e){ return defaultState(); }
 }
 let state = loadState();
+
+/* ---------- migración de esquema (v1 → v2: noches y tipos de reparto) ---------- */
+const CATS = { alojamiento:"Alojamiento", transporte:"Transporte", comida:"Comida y súper", otros:"Otros" };
+function migrateTrip(t){
+  if(t.schema >= 2) return t;
+  t.people.forEach(p => {
+    if(p.checkInDate === undefined){
+      p.checkInDate = p.from; p.checkOutDate = addDays(p.to, 1); // v1 era inclusivo en ambos extremos
+      delete p.from; delete p.to;
+    }
+  });
+  t.expenses.forEach(e => {
+    if(e.type === undefined){
+      e.title = e.desc; delete e.desc;
+      e.includedUserIds = e.participants || null; delete e.participants;
+      e.category = e.category || "otros";
+      if(e.mode === "days"){ e.type = "per_day"; e.to = addDays(e.to, 1); }
+      else { e.type = e.includedUserIds ? "custom_split" : "shared_all"; e.to = e.from; }
+      delete e.mode;
+    }
+  });
+  t.schema = 2;
+  return t;
+}
+state.trips.forEach(migrateTrip);
+
 function save(){ if(!storageOk) return; try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e){ storageOk = false; renderBanners(); } }
 
 const activeTrip = () => state.trips.find(t => t.id === state.activeTripId && !t.deleted) || null;
@@ -365,55 +405,112 @@ function apportion(cents, weights){
   return base;
 }
 
-function expenseInPeriod(trip, e){ return overlapDays(e.from, e.to, trip.start, trip.end) > 0; }
-
-// Devuelve participantes efectivos y el peso de cada uno para un gasto.
-function expenseSplit(trip, e){
-  const people = alivePeople(trip);
-  const parts = e.participants ? people.filter(p => e.participants.includes(p.id)) : people;
-  let weights;
-  let fallback = false;
-  if(e.mode === "equal"){
-    weights = parts.map(()=>1);
-  } else {
-    weights = parts.map(p => overlapDays(e.from, e.to, p.from, p.to));
-    if(weights.every(w => w === 0)){ weights = parts.map(()=>1); fallback = true; } // nadie presente esos días: partes iguales
+// Noches (números de día) que cubre un gasto. per_day usa rango semiabierto [from, to);
+// los tipos puntuales (shared_all, custom_split) ocurren en un solo día.
+function expenseDayNums(e){
+  if(e.type === "per_day"){
+    const out = [];
+    for(let n = d2n(e.from); n < d2n(e.to); n++) out.push(n);
+    return out.length ? out : [d2n(e.from)];
   }
-  const shares = apportion(e.amount, weights);
-  return { parts, weights, shares, fallback };
+  return [d2n(e.from)];
+}
+const presentOn = (u, n) => d2n(u.checkInDate) <= n && n < d2n(u.checkOutDate);
+
+// Reparto de un gasto según su tipo. Devuelve { shares: {userId: cents}, warning }.
+// - per_day: el costo de cada noche (monto / noches) se divide solo entre quienes están esa noche.
+// - shared_all: partes iguales entre todas las personas del viaje.
+// - custom_split: partes iguales dentro del grupo elegido; sin grupo, entre los presentes ese día.
+function shareExpense(users, e){
+  const included = e.includedUserIds ? users.filter(u => e.includedUserIds.includes(u.id)) : users;
+  const shares = {}; users.forEach(u => shares[u.id] = 0);
+  let warning = null;
+  const equalAmong = (pool, cents) => { const parts = apportion(cents, pool.map(()=>1)); pool.forEach((u,i) => shares[u.id] += parts[i]); };
+  if(e.type === "shared_all"){
+    equalAmong(users, e.amount);
+  } else if(e.type === "custom_split"){
+    let pool = e.includedUserIds ? included : users.filter(u => presentOn(u, d2n(e.from)));
+    if(!pool.length){ pool = included.length ? included : users; warning = "nadie presente ese día"; }
+    if(pool.length) equalAmong(pool, e.amount);
+  } else { // per_day
+    const days = expenseDayNums(e);
+    const daily = apportion(e.amount, days.map(()=>1));
+    let orphan = 0;
+    days.forEach((n,i) => {
+      const pool = included.filter(u => presentOn(u, n));
+      if(pool.length) equalAmong(pool, daily[i]); else orphan += daily[i];
+    });
+    if(orphan){
+      const pool = included.length ? included : users;
+      if(pool.length) equalAmong(pool, orphan);
+      warning = "noches sin nadie presente";
+    }
+  }
+  return { shares, warning };
 }
 
+// Función pura principal del motor: users [{id,name,checkInDate,checkOutDate}],
+// expenses [{id,title,amount,payerId,type,category,from,to,includedUserIds}] (montos en centavos),
+// tripDates {start,end}. Solo considera gastos con algún día dentro del periodo.
+function calculateBalances(users, expenses, tripDates){
+  const startN = d2n(tripDates.start), endN = d2n(tripDates.end);
+  const inPeriodFn = e => expenseDayNums(e).some(n => n >= startN && n <= endN);
+  const per = {}; users.forEach(u => per[u.id] = { user:u, paid:0, owed:0, byCat:{alojamiento:0,transporte:0,comida:0,otros:0}, net:0 });
+  const inPeriod = [], warnings = {};
+  let total = 0, outOfPeriod = 0;
+  for(const e of expenses){
+    if(!inPeriodFn(e)){ outOfPeriod++; continue; }
+    inPeriod.push(e); total += e.amount;
+    if(per[e.payerId]) per[e.payerId].paid += e.amount;
+    const r = shareExpense(users, e);
+    if(r.warning) warnings[e.id] = r.warning;
+    const cat = ["alojamiento","transporte","comida"].includes(e.category) ? e.category : "otros";
+    users.forEach(u => { const c = r.shares[u.id]; if(c){ per[u.id].owed += c; per[u.id].byCat[cat] += c; } });
+  }
+  users.forEach(u => { per[u.id].net = per[u.id].paid - per[u.id].owed; });
+  return { per, total, inPeriod, outOfPeriod, warnings };
+}
+
+// Hitos de salida: en orden cronológico de check-out, cada persona que se va salda su
+// cuenta antes de irse (los que quedan asumen el resto); en el último check-out se
+// cierra el viaje con el mínimo de transferencias (mayor deudor → mayor acreedor).
+function settlementMilestones(users, per){
+  const bal = new Map(users.map(u => [u.id, per[u.id].net]));
+  const dates = [...new Set(users.map(u => u.checkOutDate))].sort();
+  const settled = new Set();
+  const milestones = [];
+  dates.forEach((date, di) => {
+    const isLast = di === dates.length - 1;
+    const leaving = users.filter(u => u.checkOutDate === date);
+    const leavingIds = new Set(leaving.map(u => u.id));
+    const pending = () => users.filter(u => !settled.has(u.id));
+    const mustZero = isLast ? pending() : leaving;
+    const transfers = [];
+    for(;;){
+      const l = mustZero.filter(u => bal.get(u.id) !== 0).sort((a,b) => Math.abs(bal.get(b.id)) - Math.abs(bal.get(a.id)))[0];
+      if(!l) break;
+      const lb = bal.get(l.id);
+      // contraparte: primero otro que también se va hoy, luego el mayor saldo opuesto
+      const c = pending().filter(u => u.id !== l.id && Math.sign(bal.get(u.id)) === -Math.sign(lb))
+        .sort((a,b) => (leavingIds.has(b.id) - leavingIds.has(a.id)) || (Math.abs(bal.get(b.id)) - Math.abs(bal.get(a.id))))[0];
+      if(!c) break; // los saldos pendientes suman 0, así que siempre debería existir
+      const x = Math.min(Math.abs(lb), Math.abs(bal.get(c.id)));
+      transfers.push(lb < 0 ? { from:l.name, to:c.name, cents:x } : { from:c.name, to:l.name, cents:x });
+      bal.set(l.id, lb + (lb < 0 ? x : -x));
+      bal.set(c.id, bal.get(c.id) + (lb < 0 ? -x : x));
+    }
+    leaving.forEach(u => settled.add(u.id));
+    milestones.push({ date, leaving: leaving.map(u => u.name), transfers, isLast });
+  });
+  return milestones;
+}
+
+// Adaptador entre el estado del viaje y el motor puro.
 function computeTrip(trip){
-  const people = alivePeople(trip);
-  const paid = {}, owed = {};
-  people.forEach(p => { paid[p.id] = 0; owed[p.id] = 0; });
-  const inPeriod = aliveExpenses(trip).filter(e => expenseInPeriod(trip, e));
-  const outOfPeriod = aliveExpenses(trip).length - inPeriod.length;
-  let total = 0;
-  for(const e of inPeriod){
-    total += e.amount;
-    if(paid[e.payerId] !== undefined) paid[e.payerId] += e.amount;
-    const { parts, shares } = expenseSplit(trip, e);
-    parts.forEach((p,i) => { owed[p.id] += shares[i]; });
-  }
-  const nets = people.map(p => ({ id:p.id, name:p.name, paid:paid[p.id], owed:owed[p.id], net:paid[p.id]-owed[p.id] }));
-  return { total, nets, inPeriod, outOfPeriod };
-}
-
-// Transferencias mínimas: el mayor deudor le paga al mayor acreedor, sucesivamente (máx. n−1 transferencias).
-function settle(nets){
-  const debtors = nets.filter(n => n.net < 0).map(n => ({ id:n.id, name:n.name, amt:-n.net })).sort((a,b)=>b.amt-a.amt);
-  const creditors = nets.filter(n => n.net > 0).map(n => ({ id:n.id, name:n.name, amt:n.net })).sort((a,b)=>b.amt-a.amt);
-  const transfers = [];
-  let i = 0, j = 0;
-  while(i < debtors.length && j < creditors.length){
-    const x = Math.min(debtors[i].amt, creditors[j].amt);
-    if(x > 0) transfers.push({ from:debtors[i].name, to:creditors[j].name, cents:x });
-    debtors[i].amt -= x; creditors[j].amt -= x;
-    if(debtors[i].amt === 0) i++;
-    if(creditors[j].amt === 0) j++;
-  }
-  return transfers;
+  const users = alivePeople(trip);
+  const r = calculateBalances(users, aliveExpenses(trip), { start: trip.start, end: trip.end });
+  const nets = users.map(u => ({ id:u.id, name:u.name, ...r.per[u.id] }));
+  return { total: r.total, nets, inPeriod: r.inPeriod, outOfPeriod: r.outOfPeriod, warnings: r.warnings, per: r.per, users };
 }
 
 /* ---------- compartir (enlace / archivo) ---------- */
@@ -532,11 +629,11 @@ function renderTripSelect(){
 }
 
 function statsHTML(trip, calc){
-  const dias = spanDays(trip.start, trip.end);
+  const noches = nightsBetween(trip.start, trip.end);
   return `<div class="stats">
     <div class="stat"><div class="k">Total del periodo</div><div class="v">${fmt(trip, calc.total)}</div></div>
     <div class="stat"><div class="k">Personas</div><div class="v">${calc.nets.length}</div></div>
-    <div class="stat"><div class="k">Días</div><div class="v">${dias}</div></div>
+    <div class="stat"><div class="k">Noches</div><div class="v">${noches}</div></div>
   </div>`;
 }
 
@@ -556,17 +653,27 @@ function gastosHTML(trip, calc){
     people.map(p => `<button class="chip" aria-pressed="${expenseFilter===p.id}" data-act="filter" data-id="${p.id}">${esc(p.name)}${p.id===me?" (tú)":""}</button>`).join("") +
   `</div>`;
   const rows = sorted.map(e => {
-    const split = expenseSplit(trip, e);
-    const among = e.participants ? split.parts.map(p=>p.name).join(", ") : "todos";
-    const modo = e.mode === "equal" ? "partes iguales" : "por días";
+    const included = e.includedUserIds ? people.filter(p => e.includedUserIds.includes(p.id)).map(p=>p.name).join(", ") : null;
+    let modo, among, when;
+    if(e.type === "per_day"){
+      modo = "por noche";
+      among = included || "quienes duermen cada noche";
+      const n = nightsBetween(e.from, e.to) || 1;
+      when = `${fmtRange(e.from, addDays(e.to, -1))} · ${n} noche${n===1?"":"s"}`;
+    } else if(e.type === "shared_all"){
+      modo = "todos por igual"; among = "todo el grupo"; when = fmtDate(e.from);
+    } else {
+      modo = "grupo del día"; among = included || "presentes ese día"; when = fmtDate(e.from);
+    }
+    const warn = calc.warnings[e.id];
     const who = e.addedBy ? ` · agregado por ${esc(personName(trip, e.addedBy))}` : "";
     return `<li class="row">
       <div class="grow">
-        <div class="title">${esc(e.desc)} <span class="pill">${modo}</span>${split.fallback?` <span class="pill neg">nadie presente esos días</span>`:""}</div>
-        <div class="sub">${fmtRange(e.from,e.to)} · pagó <strong>${esc(personName(trip, e.payerId))}</strong> · entre ${esc(among)}${who}</div>
+        <div class="title">${esc(e.title)} <span class="pill">${CATS[e.category]||CATS.otros}</span> <span class="pill">${modo}</span>${warn?` <span class="pill neg">${esc(warn)}</span>`:""}</div>
+        <div class="sub">${when} · pagó <strong>${esc(personName(trip, e.payerId))}</strong> · entre ${esc(among)}${who}</div>
       </div>
       <span class="amount">${fmt(trip, e.amount)}</span>
-      <button class="iconbtn" data-act="expense-edit" data-id="${e.id}" aria-label="Editar gasto ${esc(e.desc)}">✎</button>
+      <button class="iconbtn" data-act="expense-edit" data-id="${e.id}" aria-label="Editar gasto ${esc(e.title)}">✎</button>
     </li>`;
   }).join("");
   const emptyMsg = calc.inPeriod.length === 0
@@ -586,11 +693,11 @@ function personasHTML(trip, calc){
   const me = meId(trip);
   const rows = alivePeople(trip).map(p => {
     const n = calc.nets.find(x => x.id === p.id);
-    const dias = overlapDays(p.from, p.to, trip.start, trip.end);
+    const noches = overlapNights(p.checkInDate, p.checkOutDate, trip.start, trip.end);
     return `<li class="row">
       <div class="grow">
         <div class="title">${esc(p.name)}${p.id===me?` <span class="pill acc">tú</span>`:""}</div>
-        <div class="sub">${fmtRange(p.from,p.to)} · ${dias} día${dias===1?"":"s"} en el periodo · pagó ${fmt(trip, n.paid)}</div>
+        <div class="sub">${fmtDate(p.checkInDate)} → ${fmtDate(p.checkOutDate)} · ${noches} noche${noches===1?"":"s"} en el periodo · pagó ${fmt(trip, n.paid)}</div>
       </div>
       <span class="amount ${n.net>0?"pos":n.net<0?"neg":""}">${n.net>0?"+":""}${fmt(trip, n.net)}</span>
       <button class="iconbtn" data-act="person-edit" data-id="${p.id}" aria-label="Editar a ${esc(p.name)}">✎</button>
@@ -605,29 +712,41 @@ function personasHTML(trip, calc){
 }
 
 function cuentasHTML(trip, calc){
-  const transfers = settle(calc.nets);
+  const miles = settlementMilestones(calc.users, calc.per);
+  const anyTransfer = miles.some(m => m.transfers.length);
   const balRows = calc.nets.map(n => `<tr>
       <td><strong>${esc(n.name)}</strong></td>
+      <td class="num">${n.byCat.alojamiento ? fmt(trip, n.byCat.alojamiento) : "—"}</td>
+      <td class="num">${n.byCat.transporte ? fmt(trip, n.byCat.transporte) : "—"}</td>
+      <td class="num">${n.byCat.comida ? fmt(trip, n.byCat.comida) : "—"}</td>
+      <td class="num">${n.byCat.otros ? fmt(trip, n.byCat.otros) : "—"}</td>
+      <td class="num"><strong>${fmt(trip, n.owed)}</strong></td>
       <td class="num">${fmt(trip, n.paid)}</td>
-      <td class="num">${fmt(trip, n.owed)}</td>
       <td class="num"><span class="amount ${n.net>0?"pos":n.net<0?"neg":""}">${n.net>0?"+":""}${fmt(trip, n.net)}</span></td>
     </tr>`).join("");
-  const tHTML = transfers.length
-    ? transfers.map(t => `<div class="transfer"><span class="who">${esc(t.from)}</span><span class="arrow">⟶</span><span class="who">${esc(t.to)}</span><span class="amount">${fmt(trip, t.cents)}</span></div>`).join("")
-    : `<p class="note">Nada pendiente: las cuentas están saldadas. 🎉</p>`;
+  const milesHTML = miles.map(m => {
+    const label = m.isLast ? `cierre del viaje · se va${m.leaving.length>1?"n":""} ${m.leaving.join(" y ")}` : `se va${m.leaving.length>1?"n":""} ${m.leaving.join(" y ")}`;
+    const body = m.transfers.length
+      ? m.transfers.map(t => `<div class="transfer"><span class="who">${esc(t.from)}</span><span class="arrow">⟶</span><span class="who">${esc(t.to)}</span><span class="amount">${fmt(trip, t.cents)}</span></div>`).join("")
+      : `<p class="note" style="margin:4px 0 8px">Sin transferencias pendientes en este hito.</p>`;
+    return `<div class="milestone">
+      <div class="mdate"><span class="pill acc">${fmtDate(m.date)}</span> ${esc(label)}</div>
+      ${body}
+    </div>`;
+  }).join("");
   return `<section class="card">
-    <h2>Balance por persona</h2>
+    <h2>Desglose por persona</h2>
     <div class="tablewrap"><table class="balances">
-      <thead><tr><th>Persona</th><th class="num">Pagó</th><th class="num">Le corresponde</th><th class="num">Saldo</th></tr></thead>
+      <thead><tr><th>Persona</th><th class="num">Aloja&shy;miento</th><th class="num">Trans&shy;porte</th><th class="num">Comida</th><th class="num">Otros</th><th class="num">Le toca</th><th class="num">Pagó</th><th class="num">Saldo</th></tr></thead>
       <tbody>${balRows}</tbody>
     </table></div>
-    <p class="hint" style="margin-top:8px">“Le corresponde” suma su parte justa de cada gasto según los días que estuvo y los repartos elegidos.</p>
+    <p class="hint" style="margin-top:8px">“Le toca” suma su parte justa de cada gasto: por noche según quién durmió cada noche, por evento entre su grupo, o entre todos.</p>
   </section>
   <section class="card">
-    <div class="cardhead"><h2>Para saldar cuentas</h2>
-      ${transfers.length?`<button class="btn small" data-act="copy-settle">Copiar resumen</button>`:""}</div>
-    ${tHTML}
-    ${transfers.length?`<p class="hint">Mínimo de transferencias: cada persona del grupo hace a lo más un par de pagos y todos quedan a mano.</p>`:""}
+    <div class="cardhead"><h2>Hitos de salida</h2>
+      ${anyTransfer?`<button class="btn small" data-act="copy-wa">Copiar para WhatsApp</button>`:""}</div>
+    ${calc.users.length ? milesHTML : `<p class="note">Agrega personas para ver los hitos.</p>`}
+    ${anyTransfer?`<p class="hint">Cada persona salda su cuenta al momento de su check-out, con el mínimo de transferencias.</p>`:""}
   </section>`;
 }
 
@@ -708,7 +827,7 @@ function openPersonDialog(id){
   $("#formPerson").reset();
   if(id){
     const p = trip.people.find(p => p.id === id);
-    $("#pName").value = p.name; $("#pFrom").value = p.from; $("#pTo").value = p.to;
+    $("#pName").value = p.name; $("#pFrom").value = p.checkInDate; $("#pTo").value = p.checkOutDate;
   } else {
     $("#pFrom").value = trip.start; $("#pTo").value = trip.end;
   }
@@ -729,15 +848,41 @@ function openExpenseDialog(id){
     `<option value="${p.id}" ${(e ? e.payerId : me) === p.id ? "selected":""}>${esc(p.name)}</option>`).join("");
   const today = todayISO();
   const def = (today >= trip.start && today <= trip.end) ? today : trip.start;
-  $("#eDesc").value = e ? e.desc : "";
+  $("#eDesc").value = e ? e.title : "";
   $("#eAmount").value = e ? (e.amount/100) : "";
-  $("#eFrom").value = e ? e.from : def;
-  $("#eTo").value = e ? e.to : def;
-  document.querySelector(`input[name=eMode][value=${e ? e.mode : "days"}]`).checked = true;
-  const selected = e && e.participants ? new Set(e.participants) : null;
+  $("#eCategory").value = e ? (e.category || "otros") : "otros";
+  const type = e ? e.type : "per_day";
+  document.querySelector(`input[name=eMode][value=${type}]`).checked = true;
+  if(type === "per_day"){
+    $("#eFrom").value = e ? e.from : trip.start;
+    $("#eTo").value = e ? e.to : trip.end;
+  } else {
+    $("#eFrom").value = e ? e.from : def;
+    $("#eTo").value = e ? e.to : def;
+  }
+  const selected = e && e.includedUserIds ? new Set(e.includedUserIds) : null;
   $("#eParts").innerHTML = people.map(p =>
     `<button type="button" class="chip" data-part="${p.id}" aria-pressed="${selected ? selected.has(p.id) : true}">${esc(p.name)}</button>`).join("");
+  updateExpenseTypeUI(type);
   $("#dlgExpense").showModal();
+}
+
+function updateExpenseTypeUI(type){
+  const trip = activeTrip();
+  const perDay = type === "per_day";
+  $("#eTo").closest(".field").style.display = perDay ? "" : "none";
+  $("#eWholeWrap").style.display = perDay ? "" : "none";
+  $("#ePartsWrap").style.display = type === "shared_all" ? "none" : "";
+  $("#eFromLabel").textContent = perDay ? "Primera noche" : "Fecha";
+  $("#eModeHint").textContent = perDay
+    ? "El costo de cada noche se divide solo entre quienes duermen esa noche (ideal para arriendos)."
+    : type === "shared_all"
+    ? "Se divide en partes iguales entre todas las personas del viaje, sin importar los días."
+    : "Partes iguales dentro del grupo del día (ej: los que usaron el auto).";
+  $("#ePartsHint").textContent = perDay
+    ? "Con todos marcados, entra al reparto quien esté presente cada noche (incluso si se suma después)."
+    : "Deja todos marcados para dividir entre quienes estén presentes ese día.";
+  if(perDay && trip && $("#eTo").value <= $("#eFrom").value){ $("#eFrom").value = trip.start; $("#eTo").value = trip.end; }
 }
 
 /* ---------- acciones ---------- */
@@ -794,13 +939,9 @@ document.addEventListener("click", async ev => {
       if(trip) await saveFile(`vaquita-${trip.name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"viaje"}.json`, JSON.stringify(trip, null, 2));
       break;
     case "import-file": $("#importFile").click(); break;
-    case "copy-settle": {
-      if(!trip) break;
-      const calc = computeTrip(trip);
-      const lines = settle(calc.nets).map(t => `• ${t.from} → ${t.to}: ${fmt(trip, t.cents)}`);
-      await copyText(`🐮 La Vaquita — ${trip.name} (${fmtRange(trip.start,trip.end)})\nTotal: ${fmt(trip, calc.total)} entre ${calc.nets.length} personas\nPara saldar cuentas:\n${lines.join("\n")}`, "Resumen copiado");
+    case "copy-wa":
+      if(trip) await copyText(whatsappText(trip), "Resumen copiado: pégalo en WhatsApp");
       break;
-    }
     case "import-accept":
       if(pendingImport){ adoptTrip(pendingImport); pendingImport = null; toast("Viaje guardado"); }
       $("#dlgImport").close();
@@ -824,6 +965,35 @@ $("#importFile").addEventListener("change", async ev => {
   } catch(e){ toast("El archivo no parece un viaje de La Vaquita"); }
 });
 
+function whatsappText(trip){
+  const calc = computeTrip(trip);
+  const miles = settlementMilestones(calc.users, calc.per);
+  const L = [];
+  L.push(`🐮 *La Vaquita — ${trip.name}*`);
+  L.push(`🗓️ ${fmtRange(trip.start, trip.end)} · 💰 Total: ${fmt(trip, calc.total)} entre ${calc.nets.length} personas`);
+  L.push("");
+  L.push(`👥 *Desglose por persona*`);
+  for(const n of calc.nets){
+    L.push("");
+    L.push(`*${n.name}* (${fmtDate(n.user.checkInDate)} → ${fmtDate(n.user.checkOutDate)})`);
+    const emo = { alojamiento:"🏠", transporte:"🚗", comida:"🛒", otros:"📦" };
+    for(const c of ["alojamiento","transporte","comida","otros"]){
+      if(n.byCat[c]) L.push(`  ${emo[c]} ${CATS[c]}: ${fmt(trip, n.byCat[c])}`);
+    }
+    L.push(`  ✅ Pagó ${fmt(trip, n.paid)} · le toca ${fmt(trip, n.owed)}`);
+    L.push(n.net === 0 ? `  🤝 Queda a mano` : n.net > 0 ? `  🟢 A favor: ${fmt(trip, n.net)}` : `  🔴 Debe: ${fmt(trip, -n.net)}`);
+  }
+  L.push("");
+  L.push(`📆 *Hitos de salida*`);
+  for(const m of miles){
+    L.push("");
+    L.push(`*${fmtDate(m.date)}* — ${m.isLast ? "cierre del viaje" : "se va" + (m.leaving.length>1?"n":"") + " " + m.leaving.join(" y ")}`);
+    if(m.transfers.length) m.transfers.forEach(t => L.push(`  👉 ${t.from} transfiere ${fmt(trip, t.cents)} a ${t.to}`));
+    else L.push(`  🤝 Sin transferencias pendientes`);
+  }
+  return L.join("\n");
+}
+
 $("#formPaste").addEventListener("submit", async ev => {
   const raw = $("#pasteBox").value.trim();
   let t = null;
@@ -836,6 +1006,7 @@ $("#formPaste").addEventListener("submit", async ev => {
 });
 
 function offerImport(t, source){
+  migrateTrip(t);
   pendingImport = t;
   const exists = state.trips.some(x => x.id === t.id);
   const nPeople = t.people.filter(p=>!p.deleted).length, nExp = t.expenses.filter(e=>!e.deleted).length;
@@ -851,12 +1022,12 @@ function offerImport(t, source){
 /* ---------- formularios ---------- */
 $("#formTrip").addEventListener("submit", ev => {
   const name = $("#tName").value.trim(), start = $("#tStart").value, end = $("#tEnd").value;
-  if(!name || !start || !end || end < start){ ev.preventDefault(); toast(end < start ? "La fecha final es antes de la inicial" : "Completa nombre y fechas"); return; }
+  if(!name || !start || !end || end <= start){ ev.preventDefault(); toast(end && end <= start ? "El viaje debe durar al menos una noche" : "Completa nombre y fechas"); return; }
   const now = Date.now();
-  const trip = { id:uid(), name, start, end, currency:$("#tCurrency").value, people:[], expenses:[], createdAt:now, updatedAt:now };
+  const trip = { id:uid(), name, start, end, currency:$("#tCurrency").value, people:[], expenses:[], schema:2, createdAt:now, updatedAt:now };
   const meName = $("#tMe").value.trim();
   if(meName){
-    const p = { id:uid(), name:meName, from:start, to:end, createdAt:now, updatedAt:now };
+    const p = { id:uid(), name:meName, checkInDate:start, checkOutDate:end, createdAt:now, updatedAt:now };
     trip.people.push(p); state.me[trip.id] = p.id;
   }
   state.trips.push(trip); state.activeTripId = trip.id; tab = "personas"; expenseFilter = "todos";
@@ -866,39 +1037,47 @@ $("#formTrip").addEventListener("submit", ev => {
 $("#formPerson").addEventListener("submit", ev => {
   const trip = activeTrip(); if(!trip) return;
   const name = $("#pName").value.trim(), from = $("#pFrom").value, to = $("#pTo").value;
-  if(!name || !from || !to || to < from){ ev.preventDefault(); toast(to < from ? "La salida es antes de la llegada" : "Completa nombre y fechas"); return; }
+  if(!name || !from || !to || to <= from){ ev.preventDefault(); toast(to && to <= from ? "Debe quedarse al menos una noche: el check-out va después del check-in" : "Completa nombre y fechas"); return; }
   if(editingPersonId){
     const p = trip.people.find(p => p.id === editingPersonId);
-    p.name = name; p.from = from; p.to = to; touch(p);
+    p.name = name; p.checkInDate = from; p.checkOutDate = to; touch(p);
   } else {
-    trip.people.push({ id:uid(), name, from, to, createdAt:Date.now(), updatedAt:Date.now() });
+    trip.people.push({ id:uid(), name, checkInDate:from, checkOutDate:to, createdAt:Date.now(), updatedAt:Date.now() });
   }
   touch(trip); save(); render();
 });
 
 $("#formExpense").addEventListener("submit", ev => {
   const trip = activeTrip(); if(!trip) return;
-  const desc = $("#eDesc").value.trim();
+  const title = $("#eDesc").value.trim();
   const amount = Math.round(parseFloat($("#eAmount").value) * 100);
-  const from = $("#eFrom").value, to = $("#eTo").value;
+  const type = document.querySelector("input[name=eMode]:checked").value;
+  const category = $("#eCategory").value;
+  const from = $("#eFrom").value;
+  const to = type === "per_day" ? $("#eTo").value : from;
   const payerId = $("#ePayer").value;
-  const mode = document.querySelector("input[name=eMode]:checked").value;
   const chips = [...document.querySelectorAll("#eParts [data-part]")];
   const on = chips.filter(c => c.getAttribute("aria-pressed") === "true").map(c => c.dataset.part);
-  if(!desc || !(amount > 0) || !from || !to || to < from || !payerId || on.length === 0){
+  const needParts = type !== "shared_all";
+  const badRange = type === "per_day" && (!to || to <= from);
+  if(!title || !(amount > 0) || !from || badRange || !payerId || (needParts && on.length === 0)){
     ev.preventDefault();
-    toast(!(amount > 0) ? "Ingresa un monto válido" : to < from ? "Revisa las fechas del gasto" : on.length === 0 ? "Elige al menos un participante" : "Completa todos los campos");
+    toast(!(amount > 0) ? "Ingresa un monto válido"
+      : badRange ? "El check-out del gasto debe ser al menos una noche después"
+      : needParts && on.length === 0 ? "Elige al menos un participante"
+      : "Completa todos los campos");
     return;
   }
-  const participants = on.length === chips.length ? null : on; // null = todos (incluye a quien se sume después)
+  const includedUserIds = (type === "shared_all" || on.length === chips.length) ? null : on; // null = todos / los presentes
   if(editingExpenseId){
     const e = trip.expenses.find(x => x.id === editingExpenseId);
-    Object.assign(e, { desc, amount, from, to, payerId, mode, participants }); touch(e);
+    Object.assign(e, { title, amount, from, to, payerId, type, category, includedUserIds }); touch(e);
   } else {
-    trip.expenses.push({ id:uid(), desc, amount, from, to, payerId, mode, participants, addedBy:meId(trip), createdAt:Date.now(), updatedAt:Date.now() });
+    trip.expenses.push({ id:uid(), title, amount, from, to, payerId, type, category, includedUserIds, addedBy:meId(trip), createdAt:Date.now(), updatedAt:Date.now() });
   }
   touch(trip); save(); render();
-  if(!expenseInPeriod(trip, { from, to })) toast("Ojo: el gasto quedó fuera del periodo configurado");
+  const startN = d2n(trip.start), endN = d2n(trip.end);
+  if(!expenseDayNums({ type, from, to }).some(n => n >= startN && n <= endN)) toast("Ojo: el gasto quedó fuera del periodo configurado");
 });
 
 document.addEventListener("change", ev => {
@@ -908,18 +1087,14 @@ document.addEventListener("change", ev => {
   const v = ev.target.value;
   if(cfg === "me"){ if(v) state.me[trip.id] = v; else delete state.me[trip.id]; save(); render(); return; }
   if(cfg === "name" && !v.trim()){ ev.target.value = trip.name; return; }
-  if(cfg === "start" && v > trip.end){ toast("El inicio no puede ser después del final"); ev.target.value = trip.start; return; }
-  if(cfg === "end" && v < trip.start){ toast("El final no puede ser antes del inicio"); ev.target.value = trip.end; return; }
+  if(cfg === "start" && v >= trip.end){ toast("El inicio debe ser antes del final (al menos una noche)"); ev.target.value = trip.start; return; }
+  if(cfg === "end" && v <= trip.start){ toast("El final debe ser después del inicio (al menos una noche)"); ev.target.value = trip.end; return; }
   trip[cfg] = cfg === "name" ? v.trim() : v;
   touch(trip); save(); render();
 });
 
 document.addEventListener("change", ev => {
-  if(ev.target.name === "eMode"){
-    $("#eModeHint").textContent = ev.target.value === "equal"
-      ? "El monto se divide igual entre los participantes, sin importar los días."
-      : "Cada persona paga según cuántos de esos días estuvo en el viaje.";
-  }
+  if(ev.target.name === "eMode") updateExpenseTypeUI(ev.target.value);
 });
 
 /* ---------- arranque ---------- */
