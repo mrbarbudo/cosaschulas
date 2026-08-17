@@ -190,6 +190,12 @@ hr.sep{border:0; border-top:1px solid var(--line); margin:16px 0}
   z-index:50; max-width:90vw; text-align:center;
 }
 .toast.show{opacity:1}
+#authArea{display:flex; justify-content:flex-end; margin:2px 0}
+.authchip{
+  display:inline-flex; align-items:center; gap:8px; background:var(--surface);
+  border:1px solid var(--line); border-radius:99px; padding:4px 6px 4px 12px; font-size:.85rem; font-weight:600;
+}
+.authchip img{width:22px; height:22px; border-radius:50%}
 .addfab{position:sticky; bottom:16px; display:flex; justify-content:flex-end; pointer-events:none; z-index:10}
 .addfab .btn{pointer-events:auto; box-shadow:var(--shadow); font-size:1rem; padding:12px 20px; border-radius:99px}
 </style>
@@ -204,6 +210,7 @@ hr.sep{border:0; border-top:1px solid var(--line); margin:16px 0}
       <select id="tripSelect" aria-label="Viaje activo"></select>
     </div>
   </header>
+  <div id="authArea"></div>
   <div id="banners"></div>
   <main id="app"></main>
 </div>
@@ -350,7 +357,7 @@ const LS_KEY = "vaquita.v1";
 let storageOk = true;
 try { localStorage.setItem("vaquita.probe","1"); localStorage.removeItem("vaquita.probe"); } catch(e){ storageOk = false; }
 
-function defaultState(){ return { version:1, activeTripId:null, me:{}, trips:[] }; }
+function defaultState(){ return { version:1, activeTripId:null, me:{}, google:null, trips:[] }; }
 function loadState(){
   if(!storageOk) return defaultState();
   try { const raw = localStorage.getItem(LS_KEY); if(!raw) return defaultState(); const s = JSON.parse(raw); return (s && Array.isArray(s.trips)) ? s : defaultState(); }
@@ -573,6 +580,7 @@ function adoptTrip(incoming){
   if(idx >= 0){ state.trips[idx] = mergeTrip(state.trips[idx], incoming); }
   else state.trips.push(incoming);
   state.activeTripId = incoming.id;
+  autoMatchMe();
   save(); render();
 }
 
@@ -600,6 +608,66 @@ async function copyText(text, okMsg){
     document.body.appendChild(ta); ta.select();
     try { document.execCommand("copy"); toast(okMsg); } catch(e2){ toast("No se pudo copiar"); }
     ta.remove();
+  }
+}
+
+/* ---------- inicio de sesión con Google (opcional) ---------- */
+// Pega aquí tu Client ID de OAuth (Google Cloud Console → Credenciales → ID de cliente
+// OAuth → Aplicación web, con tu dominio en "Orígenes de JavaScript autorizados").
+// Con el valor vacío, la app funciona igual y el botón simplemente no aparece.
+// No funciona en la vista previa de Claude (bloquea scripts externos): requiere dominio propio.
+const GOOGLE_CLIENT_ID = window.VAQUITA_GOOGLE_CLIENT_ID || "";
+
+function initGoogleLogin(){
+  if(!GOOGLE_CLIENT_ID || IN_SANDBOX) return;
+  if(window.google && google.accounts && google.accounts.id){ setupGoogle(); return; }
+  const s = document.createElement("script");
+  s.src = "https://accounts.google.com/gsi/client";
+  s.async = true; s.defer = true;
+  s.onload = setupGoogle;
+  s.onerror = () => {}; // sin red o bloqueado: la app sigue sin login
+  document.head.appendChild(s);
+}
+function setupGoogle(){
+  try {
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential, auto_select: false });
+    renderAuthArea();
+  } catch(e){}
+}
+function parseJwt(t){
+  try {
+    const b = t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/");
+    return JSON.parse(decodeURIComponent(escape(atob(b))));
+  } catch(e){ return null; }
+}
+function onGoogleCredential(resp){
+  const p = parseJwt(resp && resp.credential);
+  if(!p || !p.sub) return;
+  state.google = { name: p.name || p.email || "Invitado", email: p.email || "", sub: p.sub, picture: p.picture || "" };
+  save(); autoMatchMe(); renderAuthArea(); render();
+  toast(`Sesión iniciada como ${state.google.name}`);
+}
+// Si el nombre de Google coincide con una persona del viaje, queda como "tú" automáticamente.
+function autoMatchMe(){
+  const g = state.google; if(!g) return;
+  const norm = s => String(s).trim().toLowerCase();
+  for(const t of state.trips){
+    if(t.deleted || meId(t)) continue;
+    const match = t.people.find(p => !p.deleted && norm(p.name) === norm(g.name));
+    if(match) state.me[t.id] = match.id;
+  }
+  save();
+}
+function renderAuthArea(){
+  const el = $("#authArea"); if(!el) return;
+  if(!GOOGLE_CLIENT_ID || IN_SANDBOX){ el.innerHTML = ""; return; }
+  const g = state.google;
+  if(g){
+    el.innerHTML = `<div class="authchip">${g.picture ? `<img src="${esc(g.picture)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<span>${esc(g.name)}</span><button class="iconbtn" data-act="google-logout" aria-label="Cerrar sesión de Google" title="Cerrar sesión">✕</button></div>`;
+  } else {
+    el.innerHTML = `<div id="gBtn"></div>`;
+    try { google.accounts.id.renderButton($("#gBtn"), { type:"standard", theme:"outline", size:"medium", shape:"pill", text:"signin_with", locale:"es" }); }
+    catch(e){ el.innerHTML = ""; }
   }
 }
 
@@ -823,7 +891,8 @@ function openTripDialog(){
   $("#tSubmit").textContent = "Crear viaje";
   $("#formTrip").reset();
   const t = todayISO();
-  $("#tStart").value = t; $("#tEnd").value = t;
+  $("#tStart").value = t; $("#tEnd").value = addDays(t, 1);
+  if(state.google) $("#tMe").value = state.google.name;
   $("#dlgTrip").showModal();
 }
 function openPersonDialog(id){
@@ -837,6 +906,7 @@ function openPersonDialog(id){
     $("#pName").value = p.name; $("#pFrom").value = p.checkInDate; $("#pTo").value = p.checkOutDate;
   } else {
     $("#pFrom").value = trip.start; $("#pTo").value = trip.end;
+    if(state.google && !meId(trip)) $("#pName").value = state.google.name;
   }
   $("#dlgPerson").showModal();
 }
@@ -1001,6 +1071,11 @@ document.addEventListener("click", async ev => {
       $("#dlgImport").close();
       break;
     case "import-cancel": pendingImport = null; $("#dlgImport").close(); break;
+    case "google-logout":
+      state.google = null; save();
+      try { google.accounts.id.disableAutoSelect(); } catch(e){}
+      renderAuthArea(); render();
+      break;
   }
 });
 
@@ -1097,6 +1172,7 @@ $("#formPerson").addEventListener("submit", ev => {
     p.name = name; p.checkInDate = from; p.checkOutDate = to; touch(p);
   } else {
     trip.people.push({ id:uid(), name, checkInDate:from, checkOutDate:to, createdAt:Date.now(), updatedAt:Date.now() });
+    autoMatchMe();
   }
   touch(trip); save(); render();
 });
@@ -1166,6 +1242,8 @@ async function boot(){
   }
   if(!state.activeTripId && state.trips.length) state.activeTripId = state.trips[0].id;
   render();
+  initGoogleLogin();
+  renderAuthArea();
 }
 boot();
 </script>

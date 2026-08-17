@@ -27,6 +27,17 @@ La app es 100% estática, así que basta con GitHub Pages:
 
 Cada amigo abre esa URL, y se pasan los enlaces del viaje para sincronizar los gastos.
 
+## Inicio de sesión con Google (opcional)
+
+La app trae integrado el botón "Iniciar sesión con Google" (Google Identity Services): al entrar, cada amigo queda identificado con su nombre de Google — se usa para prellenar su persona, marcar automáticamente "tú eres" cuando su nombre coincide, y firmar los gastos que agrega. Para activarlo:
+
+1. Publica la app en un dominio propio (por ejemplo GitHub Pages, ver arriba). El login **no** funciona en la vista previa de Claude ni abriendo el archivo localmente.
+2. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crea un proyecto (gratis) → **Credenciales → Crear credenciales → ID de cliente de OAuth → Aplicación web**.
+3. En "Orígenes de JavaScript autorizados" agrega tu dominio, p. ej. `https://<usuario>.github.io`.
+4. Copia el Client ID (termina en `.apps.googleusercontent.com`) y pégalo en `index.html`, en la constante `GOOGLE_CLIENT_ID`.
+
+Sin Client ID configurado, el botón no aparece y todo lo demás funciona igual (la identidad se elige manualmente con "¿Quién eres tú?"). Nota: el login identifica a las personas, pero no crea una base de datos compartida — la sincronización entre amigos sigue siendo por enlaces/respaldos.
+
 ## Notas técnicas
 
 - Los montos se manejan internamente en centavos con reparto por *método del resto mayor*, así las partes de cada gasto siempre suman el total exacto y los saldos del grupo suman cero.
