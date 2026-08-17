@@ -138,6 +138,12 @@ ul.plain{list-style:none; margin:0; padding:0}
 }
 .milestone{border-left:3px solid var(--accent); padding-left:12px; margin:0 0 16px}
 .milestone .mdate{font-weight:600; margin-bottom:8px}
+.splitpreview{background:var(--surface2); border-radius:12px; padding:10px 12px; font-size:.85rem; margin-bottom:4px}
+.splitpreview .head{font-weight:700; margin-bottom:2px}
+.splitpreview ul{list-style:none; margin:6px 0 0; padding:0; display:grid; grid-template-columns:1fr 1fr; gap:2px 14px}
+.splitpreview li{display:flex; justify-content:space-between; gap:8px}
+.splitpreview li.z{color:var(--muted)}
+.splitpreview .warn{color:var(--warn); font-weight:600; margin-top:8px}
 .transfer .who{font-weight:700}
 .transfer .arrow{color:var(--accent); font-weight:800}
 .transfer .amount{margin-left:auto; font-family:"Bricolage Grotesque",sans-serif; font-size:1.05rem}
@@ -284,6 +290,7 @@ hr.sep{border:0; border-top:1px solid var(--line); margin:16px 0}
       <div class="chips" id="eParts"></div>
       <p class="hint" id="ePartsHint">Con todos marcados, entra al reparto quien esté presente (incluso si se suma después).</p>
     </div>
+    <div class="splitpreview" id="ePreview" aria-live="polite"></div>
     <div class="dlgactions">
       <button type="button" class="btn danger ghost" id="eDelete" data-act="expense-delete" hidden>Eliminar</button>
       <span style="flex:1"></span>
@@ -659,7 +666,7 @@ function gastosHTML(trip, calc){
       modo = "por noche";
       among = included || "quienes duermen cada noche";
       const n = nightsBetween(e.from, e.to) || 1;
-      when = `${fmtRange(e.from, addDays(e.to, -1))} · ${n} noche${n===1?"":"s"}`;
+      when = `${fmtRange(e.from, addDays(e.to, -1))} · ${n} noche${n===1?"":"s"} · ${fmt(trip, Math.round(e.amount / n))}/noche`;
     } else if(e.type === "shared_all"){
       modo = "todos por igual"; among = "todo el grupo"; when = fmtDate(e.from);
     } else {
@@ -863,8 +870,53 @@ function openExpenseDialog(id){
   const selected = e && e.includedUserIds ? new Set(e.includedUserIds) : null;
   $("#eParts").innerHTML = people.map(p =>
     `<button type="button" class="chip" data-part="${p.id}" aria-pressed="${selected ? selected.has(p.id) : true}">${esc(p.name)}</button>`).join("");
-  updateExpenseTypeUI(type);
   $("#dlgExpense").showModal();
+  updateExpenseTypeUI(type);
+}
+
+// Estado actual del formulario de gasto como borrador para el motor.
+function expenseDraftFromForm(){
+  const type = document.querySelector("input[name=eMode]:checked").value;
+  const amount = Math.round(parseFloat($("#eAmount").value) * 100);
+  const from = $("#eFrom").value;
+  const to = type === "per_day" ? $("#eTo").value : from;
+  const chips = [...document.querySelectorAll("#eParts [data-part]")];
+  const on = chips.filter(c => c.getAttribute("aria-pressed") === "true").map(c => c.dataset.part);
+  const includedUserIds = (type === "shared_all" || on.length === chips.length) ? null : on;
+  return { type, amount, from, to, includedUserIds, category: $("#eCategory").value };
+}
+
+// Vista previa en vivo: cuánto le tocará a cada persona con los valores actuales del formulario.
+function renderExpensePreview(){
+  const trip = activeTrip(); const box = $("#ePreview");
+  if(!trip || !box || !$("#dlgExpense").open) return;
+  const d = expenseDraftFromForm();
+  const users = alivePeople(trip);
+  if(!(d.amount > 0) || !d.from || (d.type === "per_day" && (!d.to || d.to <= d.from))){
+    box.innerHTML = `<div class="head">Vista previa del reparto</div><span class="note">Completa monto y fechas para ver cuánto le toca a cada persona.</span>`;
+    return;
+  }
+  const r = shareExpense(users, d);
+  let head;
+  if(d.type === "per_day"){
+    const n = nightsBetween(d.from, d.to);
+    head = `${n} noche${n===1?"":"s"} · ${fmt(trip, Math.round(d.amount / n))} por noche`;
+  } else {
+    const m = Object.values(r.shares).filter(c => c > 0).length;
+    head = `entre ${m} persona${m===1?"":"s"}`;
+  }
+  const items = users.map(u => {
+    const c = r.shares[u.id];
+    return `<li${c ? "" : ` class="z"`}><span>${esc(u.name)}</span><span class="amount">${c ? fmt(trip, c) : "—"}</span></li>`;
+  }).join("");
+  let warn = "";
+  if(r.warning){
+    warn = `<div class="warn">⚠️ Ojo: ${esc(r.warning)}.</div>`;
+  } else if(d.type === "per_day" && d.category === "alojamiento"){
+    const tripN = nightsBetween(trip.start, trip.end), n = nightsBetween(d.from, d.to);
+    if(n < tripN) warn = `<div class="warn">⚠️ Cubre ${n} de las ${tripN} noches del viaje. Si es el arriendo completo, usa “Cubre todo el viaje”.</div>`;
+  }
+  box.innerHTML = `<div class="head">Vista previa · ${head}</div><ul>${items}</ul>${warn}`;
 }
 
 function updateExpenseTypeUI(type){
@@ -883,6 +935,7 @@ function updateExpenseTypeUI(type){
     ? "Con todos marcados, entra al reparto quien esté presente cada noche (incluso si se suma después)."
     : "Deja todos marcados para dividir entre quienes estén presentes ese día.";
   if(perDay && trip && $("#eTo").value <= $("#eFrom").value){ $("#eFrom").value = trip.start; $("#eTo").value = trip.end; }
+  renderExpensePreview();
 }
 
 /* ---------- acciones ---------- */
@@ -891,6 +944,7 @@ document.addEventListener("click", async ev => {
   if(!el) return;
   if(el.dataset.part !== undefined){
     el.setAttribute("aria-pressed", el.getAttribute("aria-pressed") !== "true");
+    renderExpensePreview();
     return;
   }
   const act = el.dataset.act, id = el.dataset.id;
@@ -905,7 +959,7 @@ document.addEventListener("click", async ev => {
     case "expense-edit": openExpenseDialog(id); break;
     case "close-dlg": el.closest("dialog").close(); break;
     case "iam": if(trip){ state.me[trip.id] = id; save(); render(); } break;
-    case "expense-whole-trip": if(trip){ $("#eFrom").value = trip.start; $("#eTo").value = trip.end; } break;
+    case "expense-whole-trip": if(trip){ $("#eFrom").value = trip.start; $("#eTo").value = trip.end; renderExpensePreview(); } break;
     case "expense-delete":
       if(trip && editingExpenseId && confirm("¿Eliminar este gasto?")){
         const e = trip.expenses.find(x => x.id === editingExpenseId);
@@ -1046,6 +1100,8 @@ $("#formPerson").addEventListener("submit", ev => {
   }
   touch(trip); save(); render();
 });
+
+$("#formExpense").addEventListener("input", renderExpensePreview);
 
 $("#formExpense").addEventListener("submit", ev => {
   const trip = activeTrip(); if(!trip) return;
