@@ -50,10 +50,11 @@ header.top{
 .brand .tag{font-size:.8rem; color:var(--muted); letter-spacing:.06em; text-transform:uppercase}
 .tripswitch{display:flex; gap:8px; align-items:center}
 
-select,input[type=text],input[type=number],input[type=date]{
+select,textarea,input[type=text],input[type=number],input[type=date]{
   background:var(--surface); border:1px solid var(--line); border-radius:10px;
   padding:8px 10px; color:var(--ink); min-width:0;
 }
+textarea{resize:vertical; font-size:.85rem; font-family:ui-monospace,monospace; overflow-wrap:anywhere}
 select{cursor:pointer}
 input:invalid{border-color:var(--neg)}
 label{display:block; font-size:.82rem; font-weight:600; color:var(--muted); margin-bottom:4px}
@@ -291,6 +292,18 @@ hr.sep{border:0; border-top:1px solid var(--line); margin:16px 0}
   </div>
 </dialog>
 
+<dialog id="dlgPaste">
+  <form method="dialog" id="formPaste" novalidate>
+    <h2>Pegar respaldo</h2>
+    <p class="note" style="margin:0 0 12px">Pega un respaldo, enlace o código del viaje (parte con <code>vaquita:</code>, <code>#viaje=</code> o <code>D.</code>), o el contenido de un archivo exportado.</p>
+    <div class="field"><textarea id="pasteBox" rows="4" style="width:100%" aria-label="Respaldo del viaje"></textarea></div>
+    <div class="dlgactions">
+      <button type="button" class="btn ghost" data-act="close-dlg">Cancelar</button>
+      <button type="submit" class="btn primary">Restaurar</button>
+    </div>
+  </form>
+</dialog>
+
 <script>
 "use strict";
 /* ---------- utilidades ---------- */
@@ -309,6 +322,9 @@ let toastTimer;
 function toast(msg){ const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove("show"), 2600); }
 
 /* ---------- persistencia ---------- */
+// En la vista previa de Claude (artifact) la página corre en un sandbox cuyo
+// almacenamiento puede no sobrevivir entre visitas, aunque localStorage "funcione".
+const IN_SANDBOX = typeof window.claude !== "undefined";
 const LS_KEY = "vaquita.v1";
 let storageOk = true;
 try { localStorage.setItem("vaquita.probe","1"); localStorage.removeItem("vaquita.probe"); } catch(e){ storageOk = false; }
@@ -493,6 +509,12 @@ function renderBanners(){
     html += `<div class="banner">⚠️ Este navegador no permite guardar datos. Tus cambios viven solo en esta pestaña: usa <strong>Viaje → Copiar enlace</strong> o <strong>Exportar</strong> para no perderlos.</div>`;
   }
   const t = activeTrip();
+  if(IN_SANDBOX){
+    html += `<div class="banner">🛟 <strong>Estás en la vista previa de Claude:</strong> aquí el navegador puede borrar lo guardado entre visitas. ${t
+      ? "Antes de salir, copia el respaldo y guárdalo en el chat del grupo; al volver, pégalo y sigues donde quedaste."
+      : "¿Tenías un viaje guardado? Restáuralo pegando tu último respaldo."}
+      <span class="chips" style="margin-top:8px">${t ? `<button class="btn small" data-act="backup-copy">Copiar respaldo</button>` : ""}<button class="btn small" data-act="backup-paste">Pegar respaldo</button></span></div>`;
+  }
   if(t && alivePeople(t).length && !meId(t)){
     html += `<div class="banner ok">¿Quién eres tú en <strong>${esc(t.name)}</strong>? &nbsp;<span class="chips" style="display:inline-flex">` +
       alivePeople(t).map(p => `<button class="chip" data-act="iam" data-id="${p.id}">${esc(p.name)}</button>`).join("") +
@@ -631,9 +653,10 @@ function viajeHTML(trip){
   </section>
   <section class="card">
     <h2>Compartir con el grupo</h2>
-    <p class="note" style="margin:0 0 12px">El enlace lleva todos los datos del viaje. Cuando alguien agregue gastos, pídele que te comparta <em>su</em> enlace: al abrirlo, los cambios de ambos se combinan (gana la edición más reciente de cada cosa).</p>
+    <p class="note" style="margin:0 0 12px">El ${IN_SANDBOX ? "código" : "enlace"} lleva todos los datos del viaje. Cuando alguien agregue gastos, pídele que te comparta <em>su</em> ${IN_SANDBOX ? "código" : "enlace"}: al ${IN_SANDBOX ? "pegarlo" : "abrirlo"}, los cambios de ambos se combinan (gana la edición más reciente de cada cosa).</p>
     <div class="chips">
-      <button class="btn" data-act="share-link">Copiar enlace del viaje</button>
+      <button class="btn" data-act="share-link">${IN_SANDBOX ? "Copiar código del viaje" : "Copiar enlace del viaje"}</button>
+      <button class="btn" data-act="backup-paste">Pegar respaldo o código</button>
       <button class="btn" data-act="export">Exportar archivo</button>
       <button class="btn" data-act="import-file">Importar archivo</button>
     </div>
@@ -756,10 +779,17 @@ document.addEventListener("click", async ev => {
     case "share-link": {
       if(!trip) break;
       const code = await encodeShare(trip);
-      const base = location.origin === "null" || location.protocol === "file:" ? location.href.split("#")[0] : location.href.split("#")[0];
-      await copyText(base + "#viaje=" + code, "Enlace copiado: compártelo con el grupo");
+      if(IN_SANDBOX) await copyText("vaquita:" + code, "Código copiado: compártelo con el grupo");
+      else await copyText(location.href.split("#")[0] + "#viaje=" + code, "Enlace copiado: compártelo con el grupo");
       break;
     }
+    case "backup-copy": {
+      if(!trip) break;
+      const code = await encodeShare(trip);
+      await copyText("vaquita:" + code, "Respaldo copiado: guárdalo en el chat del grupo");
+      break;
+    }
+    case "backup-paste": $("#pasteBox").value = ""; $("#dlgPaste").showModal(); break;
     case "export":
       if(trip) await saveFile(`vaquita-${trip.name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"viaje"}.json`, JSON.stringify(trip, null, 2));
       break;
@@ -792,6 +822,17 @@ $("#importFile").addEventListener("change", async ev => {
     if(!validTrip(t)) throw new Error("shape");
     offerImport(t, "archivo");
   } catch(e){ toast("El archivo no parece un viaje de La Vaquita"); }
+});
+
+$("#formPaste").addEventListener("submit", async ev => {
+  const raw = $("#pasteBox").value.trim();
+  let t = null;
+  try {
+    const m = raw.match(/[DP]\.[A-Za-z0-9_-]+/);
+    t = m ? await decodeShare(m[0]) : JSON.parse(raw);
+  } catch(e){ t = null; }
+  if(t && validTrip(t)){ offerImport(t, "respaldo"); }
+  else { ev.preventDefault(); toast("No se reconoce el respaldo pegado"); }
 });
 
 function offerImport(t, source){
